@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quoridor Arena</title>
+<style>
+:root {
+  --bg: #f4f1ea; --panel: #fffdf8; --ink: #23201b; --muted: #7a7266; --line: #ddd5c6;
+  --cell: #e8dfcc; --cell-alt: #e2d8c2; --wall: #3b2f22; --wall-last: #e0892b;
+  --p0: #2f6fdb; --p1: #d6453d; --p0-soft: rgba(47,111,219,.16); --p1-soft: rgba(214,69,61,.16);
+  --ok: #2e8b57;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #17150f; --panel: #211e16; --ink: #ece6d8; --muted: #9a917f; --line: #38332a;
+    --cell: #2f2b21; --cell-alt: #2a261d; --wall: #d8c9a8; --wall-last: #f0a23c;
+    --p0: #5a93f0; --p1: #f0645b; --p0-soft: rgba(90,147,240,.2); --p1-soft: rgba(240,100,91,.2); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 32px; display: grid; gap: 20px; grid-template-columns: minmax(300px, 560px) minmax(0, 1fr); align-items: start; }
+@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+h1 { font-size: 20px; margin: 0 0 12px; letter-spacing: .2px; grid-column: 1 / -1; }
+h1 span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+.card { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+#board { width: 100%; height: auto; display: block; border-radius: 10px; background: var(--panel); }
+.players { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
+.pl { min-width: 0; border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; transition: border-color .15s, background .15s; }
+.pl.turn.p0 { border-color: var(--p0); background: var(--p0-soft); }
+.pl.turn.p1 { border-color: var(--p1); background: var(--p1-soft); }
+.pl b { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pl b span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+.p0 .dot { background: var(--p0); } .p1 .dot { background: var(--p1); }
+.pl small { color: var(--muted); display: block; margin-top: 2px; height: 1.4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { height: 24px; margin: 0 0 6px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status.win0 { color: var(--p0); } .status.win1 { color: var(--p1); }
+.controls { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 3px; flex: 1 1 110px; min-width: 0; }
+.controls .row > label { max-width: 100%; }
+input[type=range] { width: 100%; }
+.players-row > label { flex: 1 1 240px; }
+input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); min-width: 0; }
+button { font: inherit; padding: 7px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:disabled { opacity: .5; cursor: default; }
+input[type=range] { padding: 0; }
+.info { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; height: 2.9em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+#spark { width: 100%; height: 70px; flex: none; display: block; margin-bottom: 10px; overflow: hidden; }
+#log { height: 260px; overflow: auto; margin-top: 0; font-size: 13px; font-variant-numeric: tabular-nums; border-top: 1px solid var(--line); margin-top: 8px; }
+#log div { padding: 3px 4px; display: flex; gap: 8px; min-width: 0; border-bottom: 1px solid var(--line); }
+#log div.p0 .n { color: var(--p0); } #log div.p1 .n { color: var(--p1); }
+#log .n { width: 34px; flex: none; text-align: right; }
+#log div > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#log .sc { margin-left: auto; color: var(--muted); white-space: nowrap; }
+.hint { margin-top: 6px; font-size: 13px; color: var(--muted); height: 2.8em; overflow: hidden; }
+.humanbar { margin-top: 10px; display: none; gap: 8px; align-items: center; flex-wrap: wrap; }
+.humanbar.on { display: flex; }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.err { color: var(--p1); font-size: 13px; height: 1.4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quoridor Arena <span>бот против бота</span></h1>
+
+  <div class="card">
+    <svg id="board" viewBox="-18 -18 566 566" role="img" aria-label="Игровое поле Quoridor"></svg>
+    <div class="humanbar" id="humanbar">
+      <button id="undo">↶ Отменить ход</button>
+      <button id="toBook" title="Записать ходы этой партии как дебют: бот будет играть так же">📖 В дебют</button>
+    </div>
+    <div class="hint" id="hint"></div>
+
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="players">
+        <div class="pl p0" id="pl0"><b><i class="dot"></i><span id="n0">—</span></b><small id="i0"></small></div>
+        <div class="pl p1" id="pl1"><b><i class="dot"></i><span id="n1">—</span></b><small id="i1"></small></div>
+      </div>
+      <p class="status" id="status"></p>
+      <div class="info" id="moveinfo"></div>
+    </div>
+
+    <div class="card controls">
+      <div class="row players-row">
+        <label>Синий (ходит первым, вниз)<div id="p0"></div></label>
+        <label>Красный (вверх)<div id="p1"></div></label>
+      </div>
+      <div class="row">
+        <label>Глубина<input id="depth" type="number" min="0" max="12" value="3"></label>
+        <label>Мс на ход (0 = по глубине)<input id="ms" type="number" min="0" max="60000" value="0"></label>
+        <label>Дебют (случайных полуходов)<input id="opening" type="number" min="0" max="20" value="0"></label>
+      </div>
+      <div class="presets">
+        <button id="vsBlue">Играть против бота за синих</button>
+        <button id="vsRed">Играть против бота за красных</button>
+      </div>
+      <div class="row">
+        <button id="new" class="primary">Новая партия</button>
+        <button id="play">▶ Играть</button>
+        <button id="step">Шаг</button>
+        <label style="flex:1 1 150px"><span style="white-space:nowrap">Пауза: <b id="delayv">400</b> мс</span><input id="delay" type="range" min="0" max="1500" step="50" value="400"></label>
+      </div>
+      <div class="err" id="err"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:12px;color:var(--muted)">Оценка с точки зрения синего (в шагах пути; ±6 и выше обрезаны)</div>
+      <svg id="spark" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/picker.js"></script>
+<script>
+const CS = 50, GAP = 10, STEP = CS + GAP, N = 9, NS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+let S = null, playing = false, busy = false, autoTimer = null;
+let P0 = null, P1 = null; // выбор игроков (picker.js): .value — спецификация бота или human
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const humanTurn = () => S && S.winner < 0 && !S.draw && S.humans[S.turn];
+const anyHuman = () => S && (S.humans[0] || S.humans[1]);
+const wallLegal = (o, r, c) => !!(S && S.legal && S.legal.walls.some(w => w.k === o && w.R === r && w.C === c));
+const wallRect = (h, r, c) => h ? { x: c * STEP, y: r * STEP + CS, width: 2 * CS + GAP, height: GAP }
+                                : { x: c * STEP + CS, y: r * STEP, width: GAP, height: 2 * CS + GAP };
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function drawBoard(s) {
+  const svg = $("board"); svg.innerHTML = "";
+  svg.setAttribute("viewBox", anyHuman() ? "-18 -18 566 690" : "-18 -18 566 566"); // снизу — лоток со стенами
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    el("rect", { x: c * STEP, y: r * STEP, width: CS, height: CS, rx: 6, fill: (r + c) % 2 ? css("--cell-alt") : css("--cell") }, svg);
+    if (r === 8) el("rect", { x: c * STEP, y: r * STEP, width: CS, height: CS, rx: 6, fill: css("--p0-soft") }, svg);
+    if (r === 0) el("rect", { x: c * STEP, y: r * STEP, width: CS, height: CS, rx: 6, fill: css("--p1-soft") }, svg);
+  }
+  for (let i = 0; i < N; i++) {
+    const t1 = el("text", { x: i * STEP + CS / 2, y: N * STEP + 2, "text-anchor": "middle", "font-size": 11, fill: css("--muted") }, svg); t1.textContent = i;
+    const t2 = el("text", { x: -8, y: i * STEP + CS / 2 + 4, "text-anchor": "middle", "font-size": 11, fill: css("--muted") }, svg); t2.textContent = i;
+  }
+  const last = s.last;
+  if (last && last.kind === "pawn") {
+    el("rect", { x: last.C * STEP - 3, y: last.R * STEP - 3, width: CS + 6, height: CS + 6, rx: 9, fill: "none", stroke: css("--wall-last"), "stroke-width": 3 }, svg);
+  }
+  const wall = (h, r, c) => {
+    const isLast = last && last.kind === (h ? "h" : "v") && last.R === r && last.C === c;
+    el("rect", { ...wallRect(h, r, c), rx: 3, fill: isLast ? css("--wall-last") : css("--wall") }, svg);
+  };
+  s.hw.forEach(([r, c]) => wall(true, r, c));
+  s.vw.forEach(([r, c]) => wall(false, r, c));
+  s.pawns.forEach(([r, c], p) => {
+    const g = el("g", {}, svg);
+    el("circle", { cx: c * STEP + CS / 2, cy: r * STEP + CS / 2, r: CS * 0.36, fill: css(p ? "--p1" : "--p0"), stroke: "#fff", "stroke-width": 2 }, g);
+    const t = el("text", { x: c * STEP + CS / 2, y: r * STEP + CS / 2 + 5, "text-anchor": "middle", "font-size": 15, "font-weight": 700, fill: "#fff" }, g);
+    t.textContent = p + 1;
+  });
+
+  if (humanTurn()) {
+    const me = css(s.turn ? "--p1" : "--p0");
+    s.legal.pawn.forEach(([r, c]) => { // допустимые клетки для пешки
+      const g = el("g", { style: "cursor:pointer" }, svg);
+      el("rect", { x: c * STEP, y: r * STEP, width: CS, height: CS, rx: 6, fill: me, "fill-opacity": 0.18, stroke: me, "stroke-width": 2 }, g);
+      el("circle", { cx: c * STEP + CS / 2, cy: r * STEP + CS / 2, r: 7, fill: me, "fill-opacity": 0.8 }, g);
+      g.addEventListener("click", () => submit({ k: "pawn", r, c }));
+    });
+  }
+
+  if (anyHuman()) drawTray(s, svg);
+}
+
+// Лоток под полем: две стены (горизонтальная и вертикальная), которые перетаскиваются на поле.
+function drawTray(s, svg) {
+  const can = humanTurn() && s.walls[s.turn] > 0;
+  const me = css(s.turn ? "--p1" : "--p0");
+  el("rect", { x: -10, y: 540, width: 550, height: 126, rx: 10, fill: "none", stroke: css("--line"), "stroke-width": 1.5 }, svg);
+  const items = [["h", 110, 600, 2 * CS + GAP, GAP], ["v", 330, 548, GAP, 2 * CS + GAP]];
+  items.forEach(([o, x, y, w, h]) => {
+    const g = el("g", { style: "touch-action:none;" + (can ? "cursor:grab" : "") }, svg);
+    el("rect", { x: x - 14, y: y - 14, width: w + 28, height: h + 28, fill: "transparent" }, g);
+    el("rect", { x, y, width: w, height: h, rx: 3, fill: can ? me : css("--muted"), "fill-opacity": can ? 0.9 : 0.35 }, g);
+    if (can) {
+      g.addEventListener("touchstart", e => e.preventDefault(), { passive: false }); // не даём странице прокручиваться
+      g.addEventListener("pointerdown", e => startDrag(e, o, g));
+    }
+  });
+}
+
+function startDrag(e, o, src) {
+  e.preventDefault();
+  const svg = $("board"), me = css(S.turn ? "--p1" : "--p0");
+  const ghost = el("rect", { ...wallRect(o === "h", 0, 0), rx: 3, fill: me, "pointer-events": "none" }, svg);
+  src.setAttribute("opacity", 0.35);
+  let cur = null; // {r, c} — ближайшая позиция на поле, либо null вне поля
+  const place = (r, c, fill) => {
+    const rc = wallRect(o === "h", r, c);
+    for (const k in rc) ghost.setAttribute(k, rc[k]);
+    ghost.setAttribute("fill-opacity", fill);
+  };
+  const move = ev => {
+    const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+    const q = p.matrixTransform(svg.getScreenCTM().inverse());
+    if (q.x > -20 && q.x < 550 && q.y > -20 && q.y < 550) { // над полем: прилипаем к ближайшей позиции
+      const c = Math.max(0, Math.min(7, Math.round((q.x + GAP / 2) / STEP - 1)));
+      const r = Math.max(0, Math.min(7, Math.round((q.y + GAP / 2) / STEP - 1)));
+      cur = { r, c };
+      place(r, c, wallLegal(o, r, c) ? 0.85 : 0.25);
+    } else { // за пределами поля: стена просто следует за указателем
+      cur = null;
+      const w = o === "h" ? 2 * CS + GAP : GAP, h = o === "h" ? GAP : 2 * CS + GAP;
+      ghost.setAttribute("x", q.x - w / 2); ghost.setAttribute("y", q.y - h / 2);
+      ghost.setAttribute("width", w); ghost.setAttribute("height", h);
+      ghost.setAttribute("fill-opacity", 0.25);
+    }
+  };
+  const noScroll = ev => ev.preventDefault();
+  const up = () => {
+    window.removeEventListener("touchmove", noScroll);
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    window.removeEventListener("pointercancel", up);
+    ghost.remove(); src.removeAttribute("opacity");
+    if (cur && wallLegal(o, cur.r, cur.c)) submit({ k: o, r: cur.r, c: cur.c });
+  };
+  window.addEventListener("touchmove", noScroll, { passive: false });
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+  window.addEventListener("pointercancel", up);
+  move(e);
+}
+
+function fmtScore(v) {
+  if (v === undefined || v === null) return "";
+  if (Math.abs(v) > 29000) return (v > 0 ? "мат +" : "мат −") + (30000 - Math.abs(v));
+  return (v > 0 ? "+" : "") + (v / 100).toFixed(1);
+}
+
+function blueScore(h) { // оценка поиска у ходившего; переводим на точку зрения синего
+  if (h.score === undefined || h.score === null) return null;
+  return h.player === 0 ? h.score : -h.score;
+}
+
+function drawSpark(s) {
+  const svg = $("spark"); svg.innerHTML = "";
+  el("line", { x1: 0, x2: 300, y1: 35, y2: 35, stroke: css("--line"), "stroke-width": 1 }, svg);
+  const pts = [];
+  s.history.forEach((h, i) => { const v = blueScore(h); if (v !== null) pts.push([i, Math.max(-600, Math.min(600, v))]); });
+  if (pts.length < 2) return;
+  const n = Math.max(s.history.length - 1, 1);
+  const d = pts.map(([i, v], k) => (k ? "L" : "M") + (i / n * 300).toFixed(1) + " " + (35 - v / 600 * 32).toFixed(1)).join(" ");
+  el("path", { d, fill: "none", stroke: css("--ink"), "stroke-width": 1.5, "vector-effect": "non-scaling-stroke" }, svg);
+}
+
+function drawPanel(s) {
+  const who = p => s.humans[p] ? "вы" : s.names[p];
+  [0, 1].forEach(p => {
+    $("n" + p).textContent = s.humans[p] ? "Вы" : s.names[p];
+    $("i" + p).textContent = `стен: ${s.walls[p]} · до цели: ${s.dist[p]} шаг.`;
+    $("pl" + p).classList.toggle("turn", s.winner < 0 && !s.draw && s.turn === p);
+  });
+  const st = $("status");
+  st.className = "status";
+  queueMicrotask(() => st.title = st.textContent);
+  const color = p => p ? "красный" : "синий";
+  if (s.winner >= 0) { st.textContent = `Победил ${color(s.winner)} (${who(s.winner)}) на ходу ${s.plies}`; st.classList.add("win" + s.winner); }
+  else if (s.draw) st.textContent = `Ничья: ${s.drawReason}`;
+  else if (s.humans[s.turn]) st.textContent = `Ваш ход (${color(s.turn)})`;
+  else st.textContent = `Ход ${s.plies + 1}: думает ${color(s.turn)} (${s.names[s.turn]})`;
+  const last = s.history[s.history.length - 1];
+  $("moveinfo").textContent = last ? `${last.text}` + (last.depth ? ` · глубина ${last.depth} · ${last.nodes.toLocaleString("ru")} узлов` : "") + (last.human ? "" : ` · ${last.ms.toFixed(1)} мс`) : "Партия ещё не начата";
+  const log = $("log"), atEnd = log.scrollTop + log.clientHeight >= log.scrollHeight - 30;
+  log.innerHTML = "";
+  s.history.forEach((h, i) => {
+    const d = document.createElement("div"); d.className = "p" + h.player;
+    d.innerHTML = `<span class="n">${i + 1}.</span><span></span><span class="sc"></span>`;
+    d.children[1].textContent = (h.human ? "вы: " : "") + h.text;
+    const sc = blueScore(h);
+    d.children[2].textContent = sc === null ? "" : `${fmtScore(sc)} · d${h.depth}`;
+    log.appendChild(d);
+  });
+  if (atEnd) log.scrollTop = log.scrollHeight;
+
+  const done = s.winner >= 0 || s.draw, human = anyHuman();
+  $("step").style.display = $("play").style.display = human ? "none" : "";
+  $("step").disabled = done || busy;
+  $("play").disabled = done;
+  if (done) setPlaying(false);
+
+  const myTurn = humanTurn();
+  $("humanbar").classList.toggle("on", !!human);
+  $("undo").disabled = busy || !s.history.some(h => h.human);
+  $("toBook").disabled = busy || !myTurn || s.plies < 2;
+  $("hint").textContent = !human ? "" : done ? "" : !myTurn ? "Бот думает…" :
+    "Нажмите на подсвеченную клетку, чтобы походить пешкой, или перетащите стену из лотка на поле.";
+}
+
+function render(s) { S = s; drawBoard(s); drawSpark(s); drawPanel(s); scheduleBot(); }
+
+// Если играет человек, ходы ботов запускаются сами.
+function scheduleBot() {
+  clearTimeout(autoTimer);
+  if (!S || !anyHuman() || S.winner >= 0 || S.draw || S.humans[S.turn] || busy) return;
+  autoTimer = setTimeout(stepOnce, 350);
+}
+
+function setPlaying(v) {
+  playing = v;
+  $("play").textContent = v ? "⏸ Пауза" : "▶ Играть";
+  if (v) loop();
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function stepOnce() {
+  if (busy) return;
+  busy = true; $("err").textContent = "";
+  try { S = await api("/api/step", {}); } catch (e) { $("err").textContent = e.message; setPlaying(false); }
+  busy = false;
+  if (S) render(S);
+}
+let loopId = 0;
+async function loop() {
+  const id = ++loopId;
+  while (playing && id === loopId) {
+    await stepOnce();
+    if (!playing || id !== loopId) break;
+    await sleep(+$("delay").value);
+  }
+}
+
+async function submit(mv) {
+  if (busy || !humanTurn()) return;
+  busy = true; $("err").textContent = "";
+  try { S = await api("/api/move", mv); } catch (e) { $("err").textContent = e.message; }
+  busy = false;
+  render(S);
+}
+
+async function newGame(p0, p1) {
+  setPlaying(false); loopId++; clearTimeout(autoTimer);
+  $("err").textContent = "";
+  if (p0) P0.value = p0;
+  if (p1) P1.value = p1;
+  try {
+    S = await api("/api/new", {
+      p0: P0.value.trim(), p1: P1.value.trim(),
+      depth: +$("depth").value || 0, ms: +$("ms").value || 0, opening: +$("opening").value || 0,
+    });
+    render(S);
+  } catch (e) { $("err").textContent = e.message; }
+}
+
+$("new").onclick = () => newGame();
+// Против человека бот думает по времени (по умолчанию 500 мс на ход): это намного сильнее, чем глубина 3.
+const vsBot = (p0, p1) => { if (!+$("ms").value) $("ms").value = 500; newGame(p0, p1); };
+$("vsBlue").onclick = () => vsBot("human", "v2");
+$("vsRed").onclick = () => vsBot("v2", "human");
+$("step").onclick = stepOnce;
+$("play").onclick = () => setPlaying(!playing);
+$("delay").oninput = () => $("delayv").textContent = $("delay").value;
+$("toBook").onclick = async () => {
+  if (busy) return; busy = true; $("err").textContent = "";
+  try { S = await api("/api/book", {}); $("err").style.color = "var(--ok)"; $("err").textContent = `Записано в книгу: ${S.plies} полуходов`; setTimeout(() => { $("err").style.color = ""; $("err").textContent = ""; }, 3000); }
+  catch (e) { $("err").textContent = e.message; }
+  busy = false; render(S);
+};
+$("undo").onclick = async () => {
+  if (busy) return; clearTimeout(autoTimer); busy = true;
+  try { S = await api("/api/undo", {}); } catch (e) { $("err").textContent = e.message; }
+  busy = false; render(S);
+};
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (anyHuman()) return;
+  if (e.code === "Space") { e.preventDefault(); if (!$("play").disabled) setPlaying(!playing); }
+  if (e.code === "ArrowRight") stepOnce();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => S && render(S));
+
+(async () => {
+  try {
+    P0 = await createPicker($("p0"), { value: "v2", human: true });
+    P1 = await createPicker($("p1"), { value: "v1", human: true });
+    render(await api("/api/state"));
+  } catch (e) { $("err").textContent = e.message; }
+})();
+</script>
+</body>
+</html>
+
+
